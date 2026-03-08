@@ -401,14 +401,35 @@ say "${BLUE}[1/6]${NC} Checking GitHub CLI..."
 log "INFO" "Step 1: GitHub CLI check"
 
 if ! command -v gh &> /dev/null; then
-  say "  ${RED}FAIL${NC} GitHub CLI not found"
-  say ""
-  say "  Install GitHub CLI:"
-  say "    ${YELLOW}brew install gh${NC}"
-  say ""
-  say "  Then authenticate:"
-  say "    ${YELLOW}gh auth login${NC}"
-  die "GitHub CLI (gh) is required but not installed."
+  say "  ${YELLOW}!${NC} GitHub CLI not found — installing..."
+  log "INFO" "gh not found, attempting install"
+
+  if command -v apt-get &>/dev/null; then
+    # debian/ubuntu
+    (type -p wget >/dev/null || sudo apt-get install wget -y) \
+      && sudo mkdir -p -m 755 /etc/apt/keyrings \
+      && out=$(mktemp) && wget -qO "$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      && sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg < "$out" >/dev/null \
+      && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+      && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null \
+      && sudo apt-get update -qq \
+      && sudo apt-get install gh -y -qq
+  elif command -v brew &>/dev/null; then
+    brew install gh
+  elif command -v dnf &>/dev/null; then
+    sudo dnf install -y gh
+  elif command -v yum &>/dev/null; then
+    sudo yum install -y gh
+  else
+    die "Could not install gh — unknown package manager. Install manually: https://cli.github.com"
+  fi
+
+  if ! command -v gh &>/dev/null; then
+    die "gh installation failed."
+  fi
+  say "  ${GREEN}OK${NC}  GitHub CLI installed"
+  log "INFO" "gh installed successfully"
 fi
 
 GH_VERSION="$(gh --version | head -1)"
@@ -421,11 +442,12 @@ say "${BLUE}[2/6]${NC} Checking GitHub authentication..."
 log "INFO" "Step 2: GitHub authentication check"
 
 if ! gh auth status &>/dev/null; then
-  say "  ${RED}FAIL${NC} Not authenticated with GitHub"
-  say ""
-  say "  Authenticate with:"
-  say "    ${YELLOW}gh auth login${NC}"
-  die "GitHub authentication required."
+  say "  ${YELLOW}!${NC} Not authenticated — starting login..."
+  log "INFO" "gh not authenticated, launching login flow"
+  if ! gh auth login; then
+    die "GitHub authentication failed."
+  fi
+  say "  ${GREEN}OK${NC}  Authenticated"
 fi
 
 AUTH_USER="$(gh api user -q '.login' 2>/dev/null)" || die "Failed to query authenticated user."
