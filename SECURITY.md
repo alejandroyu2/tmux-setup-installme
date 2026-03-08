@@ -11,6 +11,18 @@ nothing runs unverified. ever.
 
 no skip. no "continue anyway?". missing files get fetched and verified automatically.
 
+## signing
+
+the signing key lives in 1Password (`signing-installer-sysax` in the Keys vault). no disk keys — 1P is the single source of truth.
+
+to re-sign after changes to `setup.sh` or `install.sh`:
+
+```
+cd /path/to/tmux-setup && bash sign.sh [/path/to/tmux-setup-installme]
+```
+
+this pulls the key from 1P, signs, updates checksums, and verifies. the key never touches disk outside a temp file that's cleaned up on exit.
+
 ## verify yourself
 
 ```
