@@ -349,7 +349,7 @@ say "${CYAN}+================================================+${NC}"
 say ""
 
 # ─── Step 0: Verify script signature (mandatory) ────────────────────────────
-say "${BLUE}[0/6]${NC} Verifying installer signature..."
+say "${BLUE}[0/8]${NC} Verifying installer signature..."
 log "INFO" "Step 0: Script signature verification"
 
 # Determine where the script lives on disk
@@ -397,7 +397,7 @@ say "  ${GREEN}OK${NC}  Script signature verified (Ed25519)"
 say ""
 
 # ─── Step 1: Check GitHub CLI ───────────────────────────────────────────────
-say "${BLUE}[1/6]${NC} Checking GitHub CLI..."
+say "${BLUE}[1/8]${NC} Checking GitHub CLI..."
 log "INFO" "Step 1: GitHub CLI check"
 
 if ! command -v gh &> /dev/null; then
@@ -438,7 +438,7 @@ log "INFO" "GitHub CLI found: $GH_VERSION"
 
 # ─── Step 2: Check GitHub authentication ────────────────────────────────────
 say ""
-say "${BLUE}[2/6]${NC} Checking GitHub authentication..."
+say "${BLUE}[2/8]${NC} Checking GitHub authentication..."
 log "INFO" "Step 2: GitHub authentication check"
 
 if ! gh auth status &>/dev/null; then
@@ -456,13 +456,13 @@ log "INFO" "Authenticated as: $AUTH_USER"
 
 # ─── Step 3: Audit token scopes ─────────────────────────────────────────────
 say ""
-say "${BLUE}[3/6]${NC} Auditing token permissions..."
+say "${BLUE}[3/8]${NC} Auditing token permissions..."
 log "INFO" "Step 3: Token scope audit"
 audit_token_scopes
 
 # ─── Step 4: Verify access to private repo ──────────────────────────────────
 say ""
-say "${BLUE}[4/6]${NC} Verifying access to ${BOLD}$PRIVATE_REPO${NC}..."
+say "${BLUE}[4/8]${NC} Verifying access to ${BOLD}$PRIVATE_REPO${NC}..."
 log "INFO" "Step 4: Private repo access check"
 
 if ! gh repo view "$PRIVATE_REPO" &>/dev/null; then
@@ -480,7 +480,7 @@ log "INFO" "Repo access verified: $PRIVATE_REPO ($REPO_VISIBILITY)"
 
 # ─── Step 5: Clone and verify private repo ──────────────────────────────────
 say ""
-say "${BLUE}[5/6]${NC} Cloning and verifying private repo..."
+say "${BLUE}[5/8]${NC} Cloning and verifying private repo..."
 log "INFO" "Step 5: Clone and verify"
 
 make_temp_dir
@@ -497,7 +497,7 @@ verify_setup_script "${CLONE_DIR}/setup.sh"
 
 # ─── Step 6: Execute setup ──────────────────────────────────────────────────
 say ""
-say "${BLUE}[6/6]${NC} Running setup..."
+say "${BLUE}[6/8]${NC} Running setup..."
 log "INFO" "Step 6: Executing setup.sh"
 
 # Log the exact command being run
@@ -509,6 +509,78 @@ if ! bash setup.sh; then
   die "setup.sh exited with an error."
 fi
 log "INFO" "setup.sh completed successfully"
+
+# ─── Step 7: Install Claude Code ─────────────────────────────────────────────
+say ""
+say "${BLUE}[7/8]${NC} Checking Claude Code..."
+log "INFO" "Step 7: Claude Code installation"
+
+if command -v claude &>/dev/null; then
+  CLAUDE_VERSION="$(claude --version 2>/dev/null || echo 'unknown')"
+  say "  ${GREEN}OK${NC}  Claude Code already installed ($CLAUDE_VERSION)"
+  log "INFO" "Claude Code already installed: $CLAUDE_VERSION"
+else
+  say "  ${YELLOW}!${NC} Claude Code not found — installing..."
+  log "INFO" "Claude Code not found, attempting install"
+
+  if command -v npm &>/dev/null; then
+    if npm install -g @anthropic-ai/claude-code; then
+      CLAUDE_VERSION="$(claude --version 2>/dev/null || echo 'unknown')"
+      say "  ${GREEN}OK${NC}  Claude Code installed ($CLAUDE_VERSION)"
+      log "INFO" "Claude Code installed via npm: $CLAUDE_VERSION"
+    else
+      say "  ${YELLOW}WARNING:${NC} Claude Code installation failed via npm"
+      say "           Install manually: ${BOLD}npm install -g @anthropic-ai/claude-code${NC}"
+      log "WARN" "Claude Code npm install failed"
+    fi
+  else
+    say "  ${YELLOW}WARNING:${NC} npm not found — cannot install Claude Code"
+    say "           Install Node.js first, then: ${BOLD}npm install -g @anthropic-ai/claude-code${NC}"
+    log "WARN" "npm not found, skipping Claude Code install"
+  fi
+fi
+
+# ─── Step 8: Create claude-dev launcher ──────────────────────────────────────
+say ""
+say "${BLUE}[8/8]${NC} Checking claude-dev launcher..."
+log "INFO" "Step 8: claude-dev launcher"
+
+CLAUDE_DEV_PATH="/usr/local/bin/claude-dev"
+
+if command -v claude-dev &>/dev/null; then
+  say "  ${GREEN}OK${NC}  claude-dev already exists ($(command -v claude-dev))"
+  log "INFO" "claude-dev already exists at $(command -v claude-dev)"
+else
+  say "  Creating ${BOLD}claude-dev${NC} launcher..."
+  log "INFO" "Creating claude-dev at $CLAUDE_DEV_PATH"
+
+  # Try /usr/local/bin first, fall back to ~/bin
+  if [ -w "/usr/local/bin" ] || sudo -n true 2>/dev/null; then
+    sudo tee "$CLAUDE_DEV_PATH" >/dev/null <<'LAUNCHER'
+#!/bin/bash
+exec claude --dangerously-skip-permissions "$@"
+LAUNCHER
+    sudo chmod +x "$CLAUDE_DEV_PATH"
+    say "  ${GREEN}OK${NC}  Created ${BOLD}${CLAUDE_DEV_PATH}${NC}"
+    log "INFO" "Created claude-dev at $CLAUDE_DEV_PATH"
+  else
+    # Fallback to ~/bin
+    mkdir -p "$HOME/bin"
+    cat > "$HOME/bin/claude-dev" <<'LAUNCHER'
+#!/bin/bash
+exec claude --dangerously-skip-permissions "$@"
+LAUNCHER
+    chmod +x "$HOME/bin/claude-dev"
+    say "  ${GREEN}OK${NC}  Created ${BOLD}$HOME/bin/claude-dev${NC}"
+    log "INFO" "Created claude-dev at $HOME/bin/claude-dev"
+
+    # Ensure ~/bin is in PATH
+    if ! echo "$PATH" | grep -q "$HOME/bin"; then
+      say "  ${YELLOW}NOTE:${NC} Add ${BOLD}$HOME/bin${NC} to your PATH if not already there"
+      log "INFO" "~/bin may not be in PATH"
+    fi
+  fi
+fi
 
 # ─── Complete ────────────────────────────────────────────────────────────────
 say ""
