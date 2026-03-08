@@ -1,17 +1,7 @@
 #!/bin/bash
-# Tmux Setup Installer - Minimal Public Script
-# This script downloads and installs from the private tmux-setup repository
-#
-# Usage: curl -fsSL https://raw.githubusercontent.com/alejandroyu2/tmux-setup-installme/main/install.sh | bash
-#
-# What this script does:
-# 1. Checks for GitHub CLI (gh)
-# 2. Verifies GitHub authentication
-# 3. Verifies access to alejandroyu2/tmux-setup (private repo)
-# 4. Clones alejandroyu2/tmux-setup
-# 5. Runs its setup.sh script
-#
-# NO passwords collected. NO tokens embedded. NO external dependencies.
+#!/bin/bash
+# Tmux Setup Installer
+# Verifies access to private repo, then installs it
 
 set -e
 
